@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Lives TikTok</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        #splashScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        #enterBtn {
+            background-color: #fe2c55;
+            color: white;
+            font-size: 22px;
+            font-weight: bold;
+            padding: 20px 40px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(254, 44, 85, 0.6);
+        }
+        #mainContent {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+        }
+        .container {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            width: 100%;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+        input, .panel-btn {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: none;
+        }
+        input {
+            background-color: #333;
+            color: white;
+            box-sizing: border-box;
+        }
+        .panel-btn {
+            background-color: #fe2c55;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .live-item {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-left: 5px solid #fe2c55;
+        }
+        .live-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #fe2c55;
+        }
+        .timer-display {
+            font-weight: bold;
+            color: #fe2c55;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Tela de Entrada -->
+    <div id="splashScreen">
+        <button id="enterBtn">ENTRAR NO SITE</button>
+    </div>
+
+    <!-- Áudio de Fundo -->
+    <audio id="bgMusic" loop>
+        <source src="https://githubusercontent.com" type="audio/mpeg">
+    </audio>
+
+    <div id="mainContent">
+        <!-- Caixa do Usuário: Anúncio da Live -->
+        <div class="container">
+            <h2>Anunciar Live do TikTok</h2>
+            <p>Insira os dados e o código de uso único gerado pelo dono:</p>
+            <input type="text" id="tiktokInput" placeholder="Ex: @nome_do_criador">
+            <input type="text" id="validationCodeInput" placeholder="Digite o Código de Validação aqui">
+            <button class="panel-btn" id="startBtn">Anunciar Live</button>
+        </div>
+
+        <!-- Lista Dinâmica de Lives Ativas -->
+        <div class="container" id="containerLives" style="display: none;">
+            <h3>Lives Anunciadas</h3>
+            <div id="listaLives"></div>
+        </div>
+    </div>
+
+    <!-- Scripts de Conexão com o Firebase -->
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+    <script src="app.js"></script> <!-- Link para o arquivo JavaScript separado -->
+</body>
+</html>
