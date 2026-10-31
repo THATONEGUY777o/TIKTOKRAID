@@ -15,32 +15,7 @@
             padding: 20px;
             margin: 0;
         }
-        #splashScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            transition: opacity 0.5s ease;
-        }
-        #enterBtn {
-            background-color: #fe2c55;
-            color: white;
-            font-size: 22px;
-            font-weight: bold;
-            padding: 20px 40px;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 0 20px rgba(254, 44, 85, 0.6);
-        }
         #mainContent {
-            display: none;
             width: 100%;
             max-width: 500px;
         }
@@ -101,17 +76,12 @@
 </head>
 <body>
 
-    <!-- 1. TELA DE ENTRADA -->
-    <div id="splashScreen">
-        <button id="enterBtn">ENTRAR NO SITE</button>
-    </div>
-
     <!-- ÁUDIO DE FUNDO -->
     <audio id="bgMusic" loop preload="auto">
         <source src="https://githubusercontent.com" type="audio/mpeg">
     </audio>
 
-    <!-- 2. CONTEÚDO PRINCIPAL -->
+    <!-- CONTEÚDO PRINCIPAL DIRETO NA TELA -->
     <div id="mainContent">
         <div class="container">
             <h2>Anunciar Live do TikTok</h2>
@@ -127,45 +97,41 @@
         </div>
     </div>
 
-    <!-- SCRIPTS DO FIREBASE COM CARREGAMENTO GARANTIDO -->
+    <!-- CARREGAMENTO DOS SCRIPTS EXTERNOS -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 
     <script>
-        // Função de segurança para garantir que o Firebase carregou antes de rodar o app
-        function iniciarAplicativo() {
-            if (typeof firebase === 'undefined') {
-                // Se falhar, tenta recarregar o script após 1 segundo
-                setTimeout(iniciarAplicativo, 1000);
-                return;
+        let database = null;
+        const bgMusic = document.getElementById('bgMusic');
+
+        // Ativa a música na primeira interação do usuário com a página (toque ou clique)
+        function ativarMusica() {
+            bgMusic.play().catch(e => console.log("Aguardando interação válida..."));
+            document.removeEventListener('click', ativarMusica);
+            document.removeEventListener('touchstart', ativarMusica);
+        }
+        document.addEventListener('click', ativarMusica);
+        document.addEventListener('touchstart', ativarMusica);
+
+        function conectarFirebase() {
+            if (typeof firebase !== 'undefined' && !database) {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyAWcHshhQWnGPIOBPRe__UyS4B9QKw3Jg8",
+                    authDomain: "://firebaseapp.com",
+                    databaseURL: "https://firebaseio.com",
+                    projectId: "tiktokliveanunciamento",
+                    storageBucket: "tiktokliveanunciamento.firebasestorage.app",
+                    messagingSenderId: "565264297620",
+                    appId: "1:565264297620:web:765ec6e871e5fa7de84e81"
+                };
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
             }
+        }
 
-            const firebaseConfig = {
-                apiKey: "AIzaSyAWcHshhQWnGPIOBPRe__UyS4B9QKw3Jg8",
-                authDomain: "://firebaseapp.com",
-                databaseURL: "https://firebaseio.com",
-                projectId: "tiktokliveanunciamento",
-                storageBucket: "tiktokliveanunciamento.firebasestorage.app",
-                messagingSenderId: "565264297620",
-                appId: "1:565264297620:web:765ec6e871e5fa7de84e81"
-            };
-
-            firebase.initializeApp(firebaseConfig);
-            const database = firebase.database();
-
-            const splashScreen = document.getElementById('splashScreen');
-            const enterBtn = document.getElementById('enterBtn');
-            const mainContent = document.getElementById('mainContent');
-            const bgMusic = document.getElementById('bgMusic');
-
-            enterBtn.addEventListener('click', () => {
-                bgMusic.play().catch(error => console.log("Música travada:", error));
-                splashScreen.style.opacity = '0';
-                setTimeout(() => {
-                    splashScreen.style.display = 'none';
-                    mainContent.style.display = 'block';
-                }, 500);
-            });
+        window.addEventListener('load', () => {
+            conectarFirebase();
 
             const startBtn = document.getElementById('startBtn');
             const listaLives = document.getElementById('listaLives');
@@ -177,6 +143,11 @@
 
                 if (!inputVal) return alert('Por favor, insira o criador da live.');
                 if (!codigoDigitado) return alert('Por favor, insira o código de validação.');
+
+                if (!database) {
+                    conectarFirebase();
+                    if (!database) return alert('O sistema está se conectando ao servidor. Aguarde 3 segundos e clique novamente.');
+                }
 
                 database.ref('codigos_gerados').once('value', (snapshot) => {
                     let codigoValido = false;
@@ -250,10 +221,7 @@
                     }
                 });
             });
-        }
-
-        // Inicializa a verificação assim que a página carregar
-        window.addEventListener('load', iniciarAplicativo);
+        });
     </script>
 </body>
 </html>
