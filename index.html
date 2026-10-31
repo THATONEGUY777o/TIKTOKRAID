@@ -46,6 +46,19 @@
             font-weight: bold;
             cursor: pointer;
         }
+        .code-container {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            margin-top: 10px;
+        }
+        #randomCode {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #00ffcc;
+        }
         .live-item {
             background-color: #2a2a2a;
             padding: 15px;
@@ -81,145 +94,161 @@
         <source src="https://githubusercontent.com" type="audio/mpeg">
     </audio>
 
-    <!-- CONTEÚDO PRINCIPAL DIRETO NA TELA -->
     <div id="mainContent">
+        <!-- SEÇÃO 1: FORMULÁRIO DE ANÚNCIO (PÚBLICO) -->
         <div class="container">
             <h2>Anunciar Live do TikTok</h2>
-            <p>Insira os dados e o código de uso único gerado pelo dono:</p>
+            <p>Insira os dados e o código de validação de uso único:</p>
             <input type="text" id="tiktokInput" placeholder="Ex: @nome_do_criador">
             <input type="text" id="validationCodeInput" placeholder="Digite o Código de Validação aqui">
             <button class="panel-btn" id="startBtn">Anunciar Live</button>
         </div>
 
+        <!-- LISTA DE LIVES ATIVAS -->
         <div class="container" id="containerLives" style="display: none;">
             <h3>Lives Anunciadas</h3>
             <div id="listaLives"></div>
         </div>
+
+        <!-- SEÇÃO 2: GERADOR DE CÓDIGO (DONO) -->
+        <div class="container">
+            <h2>Gerador de Códigos (Dono)</h2>
+            <p>Clique abaixo para gerar o token e enviá-lo direto para o seu Discord:</p>
+            <button class="panel-btn" id="generateBtn">Gerar Novo Código</button>
+            <div class="code-container">
+                <div id="randomCode">------</div>
+            </div>
+        </div>
     </div>
 
-    <!-- CARREGAMENTO DOS SCRIPTS EXTERNOS -->
+    <!-- SCRIPTS DO FIREBASE -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 
     <script>
-        let database = null;
-        const bgMusic = document.getElementById('bgMusic');
+        // Link oficial do seu Webhook integrado
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1566196923571109991/G6yOUAt9mXK2mzPHVjxpViFRJtXEgXsfGidamQwyvjSoYO3xUqwFpWuT818mSYjFtIfl";
 
-        // Ativa a música na primeira interação do usuário com a página (toque ou clique)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWcHshhQWnGPIOBPRe__UyS4B9QKw3Jg8",
+            authDomain: "://firebaseapp.com",
+            databaseURL: "https://firebaseio.com",
+            projectId: "tiktokliveanunciamento",
+            storageBucket: "tiktokliveanunciamento.firebasestorage.app",
+            messagingSenderId: "565264297620",
+            appId: "1:565264297620:web:765ec6e871e5fa7de84e81"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Inicialização do áudio por clique ou toque
+        const bgMusic = document.getElementById('bgMusic');
         function ativarMusica() {
-            bgMusic.play().catch(e => console.log("Aguardando interação válida..."));
+            bgMusic.play().catch(e => console.log("Aguardando clique..."));
             document.removeEventListener('click', ativarMusica);
             document.removeEventListener('touchstart', ativarMusica);
         }
         document.addEventListener('click', ativarMusica);
         document.addEventListener('touchstart', ativarMusica);
 
-        function conectarFirebase() {
-            if (typeof firebase !== 'undefined' && !database) {
-                const firebaseConfig = {
-                    apiKey: "AIzaSyAWcHshhQWnGPIOBPRe__UyS4B9QKw3Jg8",
-                    authDomain: "://firebaseapp.com",
-                    databaseURL: "https://firebaseio.com",
-                    projectId: "tiktokliveanunciamento",
-                    storageBucket: "tiktokliveanunciamento.firebasestorage.app",
-                    messagingSenderId: "565264297620",
-                    appId: "1:565264297620:web:765ec6e871e5fa7de84e81"
-                };
-                firebase.initializeApp(firebaseConfig);
-                database = firebase.database();
-            }
-        }
+        const startBtn = document.getElementById('startBtn');
+        const listaLives = document.getElementById('listaLives');
+        const containerLives = document.getElementById('containerLives');
 
-        window.addEventListener('load', () => {
-            conectarFirebase();
+        // 1. VALIDAÇÃO E CONSUMO DO TOKEN
+        startBtn.addEventListener('click', () => {
+            const inputVal = document.getElementById('tiktokInput').value.trim();
+            const codigoDigitado = document.getElementById('validationCodeInput').value.trim().toUpperCase();
 
-            const startBtn = document.getElementById('startBtn');
-            const listaLives = document.getElementById('listaLives');
-            const containerLives = document.getElementById('containerLives');
+            if (!inputVal || !codigoDigitado) return alert('Preencha todos os campos!');
 
-            startBtn.addEventListener('click', () => {
-                const inputVal = document.getElementById('tiktokInput').value.trim();
-                const codigoDigitado = document.getElementById('validationCodeInput').value.trim().toUpperCase();
+            database.ref('codigos_gerados').once('value', (snapshot) => {
+                let codigoValido = false;
+                let chaveDoCodigo = null;
 
-                if (!inputVal) return alert('Por favor, insira o criador da live.');
-                if (!codigoDigitado) return alert('Por favor, insira o código de validação.');
-
-                if (!database) {
-                    conectarFirebase();
-                    if (!database) return alert('O sistema está se conectando ao servidor. Aguarde 3 segundos e clique novamente.');
+                if (snapshot.exists()) {
+                    const dados = snapshot.val();
+                    for (let id in dados) {
+                        if (dados[id].codigo === codigoDigitado) {
+                            codigoValido = true;
+                            chaveDoCodigo = id;
+                            break;
+                        }
+                    }
                 }
 
-                database.ref('codigos_gerados').once('value', (snapshot) => {
-                    let codigoValido = false;
-                    let chaveDoCodigo = null;
+                if (codigoValido && chaveDoCodigo) {
+                    database.ref('codigos_gerados/' + chaveDoCodigo).remove();
+                    containerLives.style.display = 'block';
 
-                    if (snapshot.exists()) {
-                        const dados = snapshot.val();
-                        for (let id in dados) {
-                            if (dados[id].codigo === codigoDigitado) {
-                                codigoValido = true;
-                                chaveDoCodigo = id;
-                                break;
-                            }
+                    let username = inputVal.startsWith('@') ? inputVal : '@' + inputVal;
+                    const liveCard = document.createElement('div');
+                    liveCard.className = 'live-item';
+                    const timerId = 'timer_' + Date.now();
+
+                    liveCard.innerHTML = `
+                        <div class="live-info">
+                            <img class="avatar" src="https://picsum.photos" alt="Avatar">
+                            <div><strong>Live Ativa</strong><br><span class="user-text"></span></div>
+                        </div>
+                        <div class="timer-display" id="${timerId}">02:00</div>
+                    `;
+
+                    liveCard.querySelector('.user-text').textContent = username;
+                    listaLives.appendChild(liveCard);
+
+                    document.getElementById('tiktokInput').value = '';
+                    document.getElementById('validationCodeInput').value = '';
+
+                    let tempoRestante = 120;
+                    const liveCountdown = setInterval(() => {
+                        tempoRestante--;
+                        let minutos = Math.floor(tempoRestante / 60);
+                        let segundos = tempoRestante % 60;
+                        
+                        const minStr = minutos < 10 ? '0' + minutos : minutos;
+                        const segStr = segundos < 10 ? '0' + segundos : segundos;
+                        
+                        const el = document.getElementById(timerId);
+                        if (el) el.innerText = minStr + ':' + segStr;
+
+                        if (tempoRestante <= 0) {
+                            clearInterval(liveCountdown);
+                            liveCard.remove();
+                            if (listaLives.children.length === 0) containerLives.style.display = 'none';
                         }
-                    }
+                    }, 1000);
+                } else {
+                    alert('Código inválido ou já utilizado!');
+                }
+            });
+        });
 
-                    if (codigoValido && chaveDoCodigo) {
-                        database.ref('codigos_gerados/' + chaveDoCodigo).remove();
-                        containerLives.style.display = 'block';
+        // 2. DISPARO DO GERADOR + NOTIFICAÇÃO NO DISCORD
+        const generateBtn = document.getElementById('generateBtn');
+        generateBtn.addEventListener('click', () => {
+            const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let codigoGerado = '';
+            for (let i = 0; i < 6; i++) {
+                codigoGerado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+            }
 
-                        let username = inputVal;
-                        if (!username.startsWith('@')) {
-                            username = '@' + username;
-                        }
+            document.getElementById('randomCode').innerText = codigoGerado;
 
-                        const liveCard = document.createElement('div');
-                        liveCard.className = 'live-item';
-                        const timerId = 'timer_' + Date.now();
-
-                        liveCard.innerHTML = `
-                            <div class="live-info">
-                                <img class="avatar" src="https://picsum.photos" alt="Avatar">
-                                <div>
-                                    <strong>Live Ativa</strong><br>
-                                    <span class="user-text"></span>
-                                </div>
-                            </div>
-                            <div class="timer-display" id="${timerId}">02:00</div>
-                        `;
-
-                        liveCard.querySelector('.user-text').textContent = username;
-                        listaLives.appendChild(liveCard);
-
-                        document.getElementById('tiktokInput').value = '';
-                        document.getElementById('validationCodeInput').value = '';
-
-                        let tempoRestante = 120;
-                        const liveCountdown = setInterval(() => {
-                            tempoRestante--;
-                            let minutos = Math.floor(tempoRestante / 60);
-                            let segundos = tempoRestante % 60;
-                            segundos = segundos < 10 ? '0' + segundos : segundos;
-                            minutos = minutos < 10 ? '0' + minutos : minutos;
-
-                            const timerElement = document.getElementById(timerId);
-                            if (timerElement) {
-                                timerElement.innerText = minutos + ':' + segundos;
-                            }
-
-                            if (tempoRestante <= 0) {
-                                clearInterval(liveCountdown);
-                                liveCard.remove();
-                                if (listaLives.children.length === 0) {
-                                    containerLives.style.display = 'none';
-                                }
-                            }
-                        }, 1000);
-
-                    } else {
-                        alert('Código inválido ou já utilizado!');
-                    }
-                });
+            database.ref('codigos_gerados').push({
+                codigo: codigoGerado,
+                geradoEm: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                if (DISCORD_WEBHOOK_URL) {
+                    fetch(DISCORD_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            content: `🔑 **Novo código gerado:** \`${codigoGerado}\` \n*Cole no site para liberar um anúncio de 2 minutos.*`
+                        })
+                    }).catch(e => console.error("Erro no Webhook:", e));
+                }
             });
         });
     </script>
