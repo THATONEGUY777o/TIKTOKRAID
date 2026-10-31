@@ -15,7 +15,22 @@
             padding: 20px;
             margin: 0;
         }
-        /* Tela de Entrada Obligatória */
+        /* Caixa de Debug para ver o erro no celular */
+        #debugBox {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 10000;
+            max-height: 150px;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
         #splashScreen {
             position: fixed;
             top: 0;
@@ -28,7 +43,6 @@
             align-items: center;
             z-index: 9999;
             transition: opacity 0.5s ease;
-            opacity: 1;
         }
         #enterBtn {
             background-color: #fe2c55;
@@ -41,7 +55,6 @@
             cursor: pointer;
             box-shadow: 0 0 20px rgba(254, 44, 85, 0.6);
         }
-        /* Conteúdo Principal */
         #mainContent {
             display: none;
             width: 100%;
@@ -74,71 +87,53 @@
             font-weight: bold;
             cursor: pointer;
         }
-        .live-item {
-            background-color: #2a2a2a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-left: 5px solid #fe2c55;
-        }
-        .live-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            border: 2px solid #fe2c55;
-        }
-        .timer-display {
-            font-weight: bold;
-            color: #fe2c55;
-            font-size: 18px;
-        }
     </style>
+    <script>
+        // Captura erros globais antes de carregar o resto da página
+        window.onerror = function(message, source, lineno, colno, error) {
+            const debugBox = document.getElementById('debugBox');
+            if (debugBox) {
+                debugBox.innerHTML += `<div>❌ ERRO: ${message} (Linha: ${lineno})</div>`;
+            }
+            return false;
+        };
+    </script>
 </head>
 <body>
 
-    <!-- 1. TELA DE ENTRADA -->
+    <!-- Caixa de Debug Visual -->
+    <div id="debugBox">🟢 Monitor de Erros Ativo... <br></div>
+
     <div id="splashScreen">
         <button id="enterBtn">ENTRAR NO SITE</button>
     </div>
 
-    <!-- ÁUDIO DE FUNDO -->
     <audio id="bgMusic" loop preload="auto">
         <source src="https://githubusercontent.com" type="audio/mpeg">
     </audio>
 
-    <!-- 2. CONTEÚDO PRINCIPAL -->
     <div id="mainContent">
-        <!-- Caixa do Usuário -->
         <div class="container">
             <h2>Anunciar Live do TikTok</h2>
-            <p>Insira os dados e o código de uso único gerado pelo dono:</p>
             <input type="text" id="tiktokInput" placeholder="Ex: @nome_do_criador">
-            <input type="text" id="validationCodeInput" placeholder="Digite o Código de Validação aqui">
+            <input type="text" id="validationCodeInput" placeholder="Digite o Código aqui">
             <button class="panel-btn" id="startBtn">Anunciar Live</button>
         </div>
-
-        <!-- Lista Dinâmica de Lives -->
         <div class="container" id="containerLives" style="display: none;">
             <h3>Lives Anunciadas</h3>
             <div id="listaLives"></div>
         </div>
     </div>
 
-    <!-- SCRIPTS DO FIREBASE CARREGADOS ANTES DO SCRIPT LOCAL -->
+    <!-- Scripts externos -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 
     <script>
-        // Executa estritamente após a página estar totalmente pronta no navegador
-        window.addEventListener('load', () => {
+        // Adiciona um log simples para ver se o script foi lido pelo celular
+        document.getElementById('debugBox').innerHTML += "<div>Script local lido...</div>";
+
+        try {
             const firebaseConfig = {
                 apiKey: "AIzaSyAWcHshhQWnGPIOBPRe__UyS4B9QKw3Jg8",
                 authDomain: "://firebaseapp.com",
@@ -150,16 +145,18 @@
             };
 
             firebase.initializeApp(firebaseConfig);
-            const database = firebase.database();
+            document.getElementById('debugBox').innerHTML += "<div>Firebase Conectado!</div>";
 
             const splashScreen = document.getElementById('splashScreen');
             const enterBtn = document.getElementById('enterBtn');
             const mainContent = document.getElementById('mainContent');
             const bgMusic = document.getElementById('bgMusic');
 
-            // Ativa o clique do botão de entrada de forma direta
             enterBtn.addEventListener('click', () => {
-                bgMusic.play().catch(error => console.log("Música barrada pelo navegador:", error));
+                document.getElementById('debugBox').innerHTML += "<div>Botão clicado! Tentando abrir...</div>";
+                bgMusic.play().catch(e => {
+                    document.getElementById('debugBox').innerHTML += `<div>Aviso Música: ${e.message}</div>`;
+                });
                 splashScreen.style.opacity = '0';
                 setTimeout(() => {
                     splashScreen.style.display = 'none';
@@ -167,91 +164,9 @@
                 }, 500);
             });
 
-            // Lógica do botão de anúncio
-            const startBtn = document.getElementById('startBtn');
-            const listaLives = document.getElementById('listaLives');
-            const containerLives = document.getElementById('containerLives');
-
-            startBtn.addEventListener('click', () => {
-                const inputVal = document.getElementById('tiktokInput').value.trim();
-                const codigoDigitado = document.getElementById('validationCodeInput').value.trim().toUpperCase();
-
-                if (!inputVal) return alert('Por favor, insira o criador da live.');
-                if (!codigoDigitado) return alert('Por favor, insira o código de validação.');
-
-                database.ref('codigos_gerados').once('value', (snapshot) => {
-                    let codigoValido = false;
-                    let chaveDoCodigo = null;
-
-                    if (snapshot.exists()) {
-                        const dados = snapshot.val();
-                        for (let id in dados) {
-                            if (dados[id].codigo === codigoDigitado) {
-                                codigoValido = true;
-                                chaveDoCodigo = id;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (codigoValido && chaveDoCodigo) {
-                        database.ref('codigos_gerados/' + chaveDoCodigo).remove();
-                        containerLives.style.display = 'block';
-
-                        let username = inputVal;
-                        if (!username.startsWith('@')) {
-                            username = '@' + username;
-                        }
-
-                        const liveCard = document.createElement('div');
-                        liveCard.className = 'live-item';
-                        const timerId = 'timer_' + Date.now();
-
-                        liveCard.innerHTML = `
-                            <div class="live-info">
-                                <img class="avatar" src="https://picsum.photos" alt="Avatar">
-                                <div>
-                                    <strong>Live Ativa</strong><br>
-                                    <span class="user-text"></span>
-                                </div>
-                            </div>
-                            <div class="timer-display" id="${timerId}">02:00</div>
-                        `;
-
-                        liveCard.querySelector('.user-text').textContent = username;
-                        listaLives.appendChild(liveCard);
-
-                        document.getElementById('tiktokInput').value = '';
-                        document.getElementById('validationCodeInput').value = '';
-
-                        let tempoRestante = 120;
-                        const liveCountdown = setInterval(() => {
-                            tempoRestante--;
-                            let minutos = Math.floor(tempoRestante / 60);
-                            let segundos = tempoRestante % 60;
-                            segundos = segundos < 10 ? '0' + segundos : segundos;
-                            minutos = minutos < 10 ? '0' + minutos : minutos;
-
-                            const timerElement = document.getElementById(timerId);
-                            if (timerElement) {
-                                timerElement.innerText = minutos + ':' + segundos;
-                            }
-
-                            if (tempoRestante <= 0) {
-                                clearInterval(liveCountdown);
-                                liveCard.remove();
-                                if (listaLives.children.length === 0) {
-                                    containerLives.style.display = 'none';
-                                }
-                            }
-                        }, 1000);
-
-                    } else {
-                        alert('Código inválido ou já utilizado!');
-                    }
-                });
-            });
-        });
+        } catch (err) {
+            document.getElementById('debugBox').innerHTML += `<div>❌ Erro no Bloco Principal: ${err.message}</div>`;
+        }
     </script>
 </body>
 </html>
