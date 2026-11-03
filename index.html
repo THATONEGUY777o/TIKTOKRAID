@@ -46,19 +46,6 @@
             font-weight: bold;
             cursor: pointer;
         }
-        .code-container {
-            background-color: #2a2a2a;
-            padding: 15px;
-            border-radius: 5px;
-            text-align: center;
-            margin-top: 10px;
-        }
-        #randomCode {
-            font-size: 24px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            color: #00ffcc;
-        }
         .live-item {
             background-color: #2a2a2a;
             padding: 15px;
@@ -89,46 +76,33 @@
 </head>
 <body>
 
-    <!-- ÁUDIO DE FUNDO -->
+    <!-- ÁUDIO DE FUNDO (MÚSICA DO SEU VÍDEO) -->
     <audio id="bgMusic" loop preload="auto">
         <source src="https://githubusercontent.com" type="audio/mpeg">
     </audio>
 
+    <!-- CONTEÚDO EXCLUSIVO DO USUÁRIO -->
     <div id="mainContent">
-        <!-- SEÇÃO 1: FORMULÁRIO DE ANÚNCIO (PÚBLICO) -->
         <div class="container">
             <h2>Anunciar Live do TikTok</h2>
-            <p>Insira os dados e o código de validação de uso único:</p>
+            <p>Insira os dados e o código de validação de uso único fornecido pelo dono:</p>
             <input type="text" id="tiktokInput" placeholder="Ex: @nome_do_criador">
             <input type="text" id="validationCodeInput" placeholder="Digite o Código de Validação aqui">
             <button class="panel-btn" id="startBtn">Anunciar Live</button>
         </div>
 
-        <!-- LISTA DE LIVES ATIVAS -->
+        <!-- LISTA DE LIVES FILTRADAS INTERNAS -->
         <div class="container" id="containerLives" style="display: none;">
             <h3>Lives Anunciadas</h3>
             <div id="listaLives"></div>
         </div>
-
-        <!-- SEÇÃO 2: GERADOR DE CÓDIGO (DONO) -->
-        <div class="container">
-            <h2>Gerador de Códigos (Dono)</h2>
-            <p>Clique abaixo para gerar o token e enviá-lo direto para o seu Discord:</p>
-            <button class="panel-btn" id="generateBtn">Gerar Novo Código</button>
-            <div class="code-container">
-                <div id="randomCode">------</div>
-            </div>
-        </div>
     </div>
 
-    <!-- SCRIPTS DO FIREBASE -->
+    <!-- SCRIPTS DE ACESSO DO FIREBASE -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 
     <script>
-        // Link oficial do seu Webhook integrado
-        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1566196923571109991/G6yOUAt9mXK2mzPHVjxpViFRJtXEgXsfGidamQwyvjSoYO3xUqwFpWuT818mSYjFtIfl";
-
         const firebaseConfig = {
             apiKey: "AIzaSyAWcHshhQWnGPIOBPRe__UyS4B9QKw3Jg8",
             authDomain: "://firebaseapp.com",
@@ -142,10 +116,10 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // Inicialização do áudio por clique ou toque
+        // Ativa a música na primeira interação do usuário na tela
         const bgMusic = document.getElementById('bgMusic');
         function ativarMusica() {
-            bgMusic.play().catch(e => console.log("Aguardando clique..."));
+            bgMusic.play().catch(e => console.log("Áudio pendente..."));
             document.removeEventListener('click', ativarMusica);
             document.removeEventListener('touchstart', ativarMusica);
         }
@@ -156,12 +130,12 @@
         const listaLives = document.getElementById('listaLives');
         const containerLives = document.getElementById('containerLives');
 
-        // 1. VALIDAÇÃO E CONSUMO DO TOKEN
+        // VALIDAÇÃO EM NUVEM E INICIALIZAÇÃO DA FILA
         startBtn.addEventListener('click', () => {
             const inputVal = document.getElementById('tiktokInput').value.trim();
             const codigoDigitado = document.getElementById('validationCodeInput').value.trim().toUpperCase();
 
-            if (!inputVal || !codigoDigitado) return alert('Preencha todos os campos!');
+            if (!inputVal || !codigoDigitado) return alert('Por favor, preencha todos os campos!');
 
             database.ref('codigos_gerados').once('value', (snapshot) => {
                 let codigoValido = false;
@@ -179,6 +153,7 @@
                 }
 
                 if (codigoValido && chaveDoCodigo) {
+                    // Consome o token do banco imediatamente (Uso Único)
                     database.ref('codigos_gerados/' + chaveDoCodigo).remove();
                     containerLives.style.display = 'block';
 
@@ -221,33 +196,6 @@
                     }, 1000);
                 } else {
                     alert('Código inválido ou já utilizado!');
-                }
-            });
-        });
-
-        // 2. DISPARO DO GERADOR + NOTIFICAÇÃO NO DISCORD
-        const generateBtn = document.getElementById('generateBtn');
-        generateBtn.addEventListener('click', () => {
-            const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let codigoGerado = '';
-            for (let i = 0; i < 6; i++) {
-                codigoGerado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
-            }
-
-            document.getElementById('randomCode').innerText = codigoGerado;
-
-            database.ref('codigos_gerados').push({
-                codigo: codigoGerado,
-                geradoEm: firebase.database.ServerValue.TIMESTAMP
-            }).then(() => {
-                if (DISCORD_WEBHOOK_URL) {
-                    fetch(DISCORD_WEBHOOK_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            content: `🔑 **Novo código gerado:** \`${codigoGerado}\` \n*Cole no site para liberar um anúncio de 2 minutos.*`
-                        })
-                    }).catch(e => console.error("Erro no Webhook:", e));
                 }
             });
         });
