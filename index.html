@@ -5,100 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Lives TikTok</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            margin: 0;
-        }
-        #mainContent {
-            width: 100%;
-            max-width: 500px;
-        }
-        .container {
-            background-color: #1e1e1e;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            width: 100%;
-            margin-bottom: 20px;
-            box-sizing: border-box;
-        }
-        input, .panel-btn {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border: none;
-        }
-        input {
-            background-color: #333;
-            color: white;
-            box-sizing: border-box;
-        }
-        .panel-btn {
-            background-color: #fe2c55;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .live-item {
-            background-color: #2a2a2a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-left: 5px solid #fe2c55;
-        }
-        .live-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            border: 2px solid #fe2c55;
-        }
-        .timer-display {
-            font-weight: bold;
-            color: #fe2c55;
-            font-size: 18px;
-        }
+        body { font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        #mainContent { width: 100%; max-width: 500px; }
+        .container { background-color: #1e1e1e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); width: 100%; margin-bottom: 20px; box-sizing: border-box; }
+        input, .panel-btn { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; }
+        input { background-color: #333; color: white; box-sizing: border-box; }
+        .panel-btn { background-color: #fe2c55; color: white; font-weight: bold; cursor: pointer; }
+        .live-item { background-color: #2a2a2a; padding: 15px; border-radius: 8px; margin-top: 10px; display: flex; flex-direction: column; border-left: 5px solid #fe2c55; }
+        .live-info { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+        .live-user { display: flex; align-items: center; gap: 15px; }
+        .avatar { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fe2c55; }
+        .vote-section { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid #444; }
+        .vote-btn { background-color: #333; color: #fff; border: 1px solid #555; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-size: 14px; }
+        .vote-count { font-weight: bold; color: #ffcc00; }
     </style>
 </head>
 <body>
 
-    <!-- ÁUDIO DE FUNDO (MÚSICA DO SEU VÍDEO) -->
     <audio id="bgMusic" loop preload="auto">
         <source src="https://githubusercontent.com" type="audio/mpeg">
     </audio>
 
-    <!-- CONTEÚDO EXCLUSIVO DO USUÁRIO -->
     <div id="mainContent">
+        <!-- PAINEL DO DONO -->
         <div class="container">
-            <h2>Anunciar Live do TikTok</h2>
-            <p>Insira os dados e o código de validação de uso único fornecido pelo dono:</p>
-            <input type="text" id="tiktokInput" placeholder="Ex: @nome_do_criador">
-            <input type="text" id="validationCodeInput" placeholder="Digite o Código de Bypass Do Cooldown (Opcional)">
-            <button class="panel-btn" id="startBtn">Anunciar Live</button>
+            <h2>Painel do Dono</h2>
+            <input type="text" id="ownerCodeInput" placeholder="Código do seu iPhone">
+            <input type="text" id="targetUserInput" placeholder="Ex: @nome_da_live_para_fechar">
+            <button class="panel-btn" id="ownerRemoveBtn" style="background-color: #333; border: 1px solid #fe2c55;">Remover Live na Hora</button>
         </div>
 
-        <!-- LISTA DE LIVES FILTRADAS INTERNAS -->
-        <div class="container" id="containerLives" style="display: none;">
-            <h3>Lives Anunciadas</h3>
+        <!-- FORMULÁRIO DE VOTAÇÃO -->
+        <div class="container">
+            <h2>Sugerir Encerramento de Live</h2>
+            <input type="text" id="tiktokInput" placeholder="Ex: @nome_do_criador">
+            <button class="panel-btn" id="startBtn">Abrir Votação de Remoção</button>
+        </div>
+
+        <!-- FILA DE VOTAÇÃO -->
+        <div class="container">
+            <h3>Fila de Votação (5 Votos removem)</h3>
             <div id="listaLives"></div>
         </div>
     </div>
 
-    <!-- SCRIPTS DE ACESSO DO FIREBASE -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 
@@ -116,84 +66,90 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // Ativa a música na primeira interação do usuário na tela
+        // Controle de Áudio
         const bgMusic = document.getElementById('bgMusic');
-        function ativarMusica() {
-            bgMusic.play().catch(e => console.log("Áudio pendente..."));
-            document.removeEventListener('click', ativarMusica);
-            document.removeEventListener('touchstart', ativarMusica);
-        }
+        function ativarMusica() { bgMusic.play().catch(e => {}); }
         document.addEventListener('click', ativarMusica);
         document.addEventListener('touchstart', ativarMusica);
 
         const startBtn = document.getElementById('startBtn');
+        const ownerRemoveBtn = document.getElementById('ownerRemoveBtn');
         const listaLives = document.getElementById('listaLives');
-        const containerLives = document.getElementById('containerLives');
 
-        // VALIDAÇÃO EM NUVEM E INICIALIZAÇÃO DA FILA
+        // Escuta a lista de votações em tempo real
+        database.ref('votas_lives').on('value', (snapshot) => {
+            listaLives.innerHTML = '';
+            if (snapshot.exists()) {
+                const dados = snapshot.val();
+                for (let id in dados) {
+                    const live = dados[id];
+                    const card = document.createElement('div');
+                    card.className = 'live-item';
+                    card.innerHTML = `
+                        <div class="live-info"><div class="live-user"><img class="avatar" src="https://picsum.photos"><div><strong>${live.usuario}</strong></div></div></div>
+                        <div class="vote-section">
+                            <button class="vote-btn" onclick="votarLive('${id}', ${live.votos || 0})">👍 Votar para Tirar</button>
+                            <span class="vote-count"><span>${live.votos || 0}</span> / 5 Votos</span>
+                        </div>`;
+                    listaLives.appendChild(card);
+                }
+            } else {
+                listaLives.innerHTML = '<p style="color:#aaa;">Nenhuma live em votação.</p>';
+            }
+        });
+
+        // Cria votação
         startBtn.addEventListener('click', () => {
-            const inputVal = document.getElementById('tiktokInput').value.trim();
-            const codigoDigitado = document.getElementById('validationCodeInput').value.trim().toUpperCase();
+            const val = document.getElementById('tiktokInput').value.trim();
+            if (!val) return alert('Insira o @!');
+            let user = val.startsWith('@') ? val : '@' + val;
+            database.ref('votas_lives').push({ usuario: user, votos: 0 }).then(() => {
+                document.getElementById('tiktokInput').value = '';
+            });
+        });
 
-            if (!inputVal || !codigoDigitado) return alert('Por favor, preencha todos os campos!');
+        // Computa votos
+        window.votarLive = function(id, votosAtuais) {
+            const novosVotos = votosAtuais + 1;
+            if (novosVotos >= 5) {
+                database.ref('votas_lives/' + id).remove();
+            } else {
+                database.ref('votas_lives/' + id).update({ votos: novosVotos });
+            }
+        };
+
+        // Derruba live usando o código gerado no iPhone
+        ownerRemoveBtn.addEventListener('click', () => {
+            const cod = document.getElementById('ownerCodeInput').value.trim();
+            const target = document.getElementById('targetUserInput').value.trim();
+            if (!cod || !target) return alert('Preencha os dados!');
+            let formatted = target.startsWith('@') ? target : '@' + target;
 
             database.ref('codigos_gerados').once('value', (snapshot) => {
-                let codigoValido = false;
-                let chaveDoCodigo = null;
-
+                let valido = false; let chave = null;
                 if (snapshot.exists()) {
-                    const dados = snapshot.val();
-                    for (let id in dados) {
-                        if (dados[id].codigo === codigoDigitado) {
-                            codigoValido = true;
-                            chaveDoCodigo = id;
-                            break;
-                        }
+                    const d = snapshot.val();
+                    for (let id in d) {
+                        if (d[id].codigo == cod || d[id] == cod) { valido = true; chave = id; break; }
                     }
                 }
 
-                if (codigoValido && chaveDoCodigo) {
-                    // Consome o token do banco imediatamente (Uso Único)
-                    database.ref('codigos_gerados/' + chaveDoCodigo).remove();
-                    containerLives.style.display = 'block';
-
-                    let username = inputVal.startsWith('@') ? inputVal : '@' + inputVal;
-                    const liveCard = document.createElement('div');
-                    liveCard.className = 'live-item';
-                    const timerId = 'timer_' + Date.now();
-
-                    liveCard.innerHTML = `
-                        <div class="live-info">
-                            <img class="avatar" src="https://picsum.photos" alt="Avatar">
-                            <div><strong>Live Ativa</strong><br><span class="user-text"></span></div>
-                        </div>
-                        <div class="timer-display" id="${timerId}">02:00</div>
-                    `;
-
-                    liveCard.querySelector('.user-text').textContent = username;
-                    listaLives.appendChild(liveCard);
-
-                    document.getElementById('tiktokInput').value = '';
-                    document.getElementById('validationCodeInput').value = '';
-
-                    let tempoRestante = 120;
-                    const liveCountdown = setInterval(() => {
-                        tempoRestante--;
-                        let minutos = Math.floor(tempoRestante / 60);
-                        let segundos = tempoRestante % 60;
-                        
-                        const minStr = minutos < 10 ? '0' + minutos : minutos;
-                        const segStr = segundos < 10 ? '0' + segundos : segundos;
-                        
-                        const el = document.getElementById(timerId);
-                        if (el) el.innerText = minStr + ':' + segStr;
-
-                        if (tempoRestante <= 0) {
-                            clearInterval(liveCountdown);
-                            liveCard.remove();
-                            if (listaLives.children.length === 0) containerLives.style.display = 'none';
+                if (valido && chave) {
+                    database.ref('codigos_gerados/' + chave).remove(); // Consome o código
+                    database.ref('votas_lives').once('value', (lSnap) => {
+                        if (lSnap.exists()) {
+                            const lives = lSnap.val();
+                            for (let lId in lives) {
+                                if (lives[lId].usuario.toUpperCase() === formatted.toUpperCase()) {
+                                    database.ref('votas_lives/' + lId).remove();
+                                    alert('Live derrubada com sucesso pelo dono!');
+                                    break;
+                                }
+                            }
                         }
-                    }, 1000);
+                    });
+                    document.getElementById('ownerCodeInput').value = '';
+                    document.getElementById('targetUserInput').value = '';
                 } else {
                     alert('Código inválido ou já utilizado!');
                 }
