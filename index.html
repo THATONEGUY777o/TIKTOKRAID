@@ -15,9 +15,11 @@
         .live-info { display: flex; align-items: center; justify-content: space-between; width: 100%; }
         .live-user { display: flex; align-items: center; gap: 15px; }
         .avatar { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fe2c55; }
+        .timer-display { font-weight: bold; color: #fe2c55; font-size: 18px; }
         .vote-section { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid #444; }
         .vote-btn { background-color: #333; color: #fff; border: 1px solid #555; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-size: 14px; }
         .vote-count { font-weight: bold; color: #ffcc00; }
+        #loadMoreBtn { background-color: #333; border: 1px solid #555; color: white; margin-top: 15px; display: none; }
     </style>
 </head>
 <body>
@@ -27,25 +29,30 @@
     </audio>
 
     <div id="mainContent">
-        <!-- PAINEL DO DONO -->
+        <!-- 1. FORMULÁRIO PRINCIPAL PARA ANUNCIAR LIVES -->
         <div class="container">
-            <h2>Painel do Dono</h2>
-            <input type="text" id="ownerCodeInput" placeholder="Código do seu iPhone">
-            <input type="text" id="targetUserInput" placeholder="Ex: @nome_da_live_para_fechar">
-            <button class="panel-btn" id="ownerRemoveBtn" style="background-color: #333; border: 1px solid #fe2c55;">Remover Live na Hora</button>
-        </div>
-
-        <!-- FORMULÁRIO DE VOTAÇÃO -->
-        <div class="container">
-            <h2>Sugerir Encerramento de Live</h2>
+            <h2>Anunciar Live do TikTok</h2>
+            <p id="limitWarning" style="color: #ff3b30; font-weight: bold; display: none;">⚠️ Limite de 10 lives atingido! Preenchimento do código opcional obrigatório para liberar vaga.</p>
             <input type="text" id="tiktokInput" placeholder="Ex: @nome_do_criador">
-            <button class="panel-btn" id="startBtn">Abrir Votação de Remoção</button>
+            <input type="text" id="validationCodeInput" placeholder="Digite o Token de Validação aqui">
+            <input type="text" id="optionalCodeInput" placeholder="Código Opcional (Necessário apenas se houver 10 lives ativas)">
+            <button class="panel-btn" id="startBtn">Anunciar Live</button>
         </div>
 
-        <!-- FILA DE VOTAÇÃO -->
+        <!-- 2. FILA DE TRANSMISSÕES ATIVAS COM PAGINAÇÃO -->
         <div class="container">
-            <h3>Fila de Votação (5 Votos removem)</h3>
+            <h3>Transmissões Ativas (<span id="totalCount">0</span>/10)</h3>
             <div id="listaLives"></div>
+            <button class="panel-btn" id="loadMoreBtn">Carregar Mais Transmissões</button>
+        </div>
+
+        <!-- 3. SISTEMA RESTRITO DE VERIFICAÇÃO -->
+        <div class="container">
+            <h2>Moderação Integrada</h2>
+            <p>Encerrar e sincronizar uma transmissão ativa imediatamente:</p>
+            <input type="text" id="ownerCodeInput" placeholder="Chave de Sincronização">
+            <input type="text" id="targetUserInput" placeholder="Ex: @nome_do_criador">
+            <button class="panel-btn" id="ownerRemoveBtn" style="background-color: #333; border: 1px solid #fe2c55;">Encerrar Transmissão</button>
         </div>
     </div>
 
@@ -66,7 +73,6 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // Controle de Áudio
         const bgMusic = document.getElementById('bgMusic');
         function ativarMusica() { bgMusic.play().catch(e => {}); }
         document.addEventListener('click', ativarMusica);
@@ -75,86 +81,176 @@
         const startBtn = document.getElementById('startBtn');
         const ownerRemoveBtn = document.getElementById('ownerRemoveBtn');
         const listaLives = document.getElementById('listaLives');
+        const loadMoreBtn = document.getElementById('loadMoreBtn');
+        const totalCountSpan = document.getElementById('totalCount');
+        const limitWarning = document.getElementById('limitWarning');
 
-        // Escuta a lista de votações em tempo real
-        database.ref('votas_lives').on('value', (snapshot) => {
+        let totalLivesAtivas = 0;
+        let limiteExibicao = 2;
+        let dadosAtuaisLives = {};
+        let intervalosAtivos = [];
+
+        function renderizarLista(dados) {
+            // Limpa a tela e limpa os relógios antigos para não pesar o celular
             listaLives.innerHTML = '';
-            if (snapshot.exists()) {
-                const dados = snapshot.val();
-                for (let id in dados) {
-                    const live = dados[id];
-                    const card = document.createElement('div');
-                    card.className = 'live-item';
-                    card.innerHTML = `
-                        <div class="live-info"><div class="live-user"><img class="avatar" src="https://picsum.photos"><div><strong>${live.usuario}</strong></div></div></div>
-                        <div class="vote-section">
-                            <button class="vote-btn" onclick="votarLive('${id}', ${live.votos || 0})">👍 Votar para Tirar</button>
-                            <span class="vote-count"><span>${live.votos || 0}</span> / 5 Votos</span>
-                        </div>`;
-                    listaLives.appendChild(card);
-                }
-            } else {
-                listaLives.innerHTML = '<p style="color:#aaa;">Nenhuma live em votação.</p>';
+            intervalosAtivos.forEach(clearInterval);
+            intervalosAtivos = [];
+
+            const chaves = Object.keys(dados);
+            totalLivesAtivas = chaves.length;
+            totalCountSpan.innerText = totalLivesAtivas;
+
+            limitWarning.style.display = totalLivesAtivas >= 10 ? 'block' : 'none';
+
+            if (totalLivesAtivas === 0) {
+                listaLives.innerHTML = '<p style="color:#aaa;">Nenhuma live ativa no painel.</p>';
+                loadMoreBtn.style.display = 'none';
+                return;
             }
+
+            let contagemRenderizada = 0;
+            for (let id in dados) {
+                if (contagemRenderizada >= limiteExibicao) break;
+
+                const live = dados[id];
+                const tempoPassado = Math.floor((Date.now() - live.criadoEm) / 1000);
+                let tempoRestante = 120 - tempoPassado;
+
+                if (tempoRestante <= 0) {
+                    database.ref('votas_lives/' + id).remove();
+                    continue;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'live-item';
+                const timerId = 'timer_' + id;
+
+                card.innerHTML = `
+                    <div class="live-info">
+                        <div class="live-user">
+                            <img class="avatar" src="https://picsum.photos">
+                            <div><strong>${live.usuario}</strong><br><span style="color:#aaa;">Transmissão Iniciada</span></div>
+                        </div>
+                        <div class="timer-display" id="${timerId}">02:00</div>
+                    </div>
+                    <div class="vote-section">
+                        <button class="vote-btn" onclick="votarLive('${id}', ${live.votos || 0})">⚠️ Reportar Instabilidade</button>
+                        <span class="vote-count"><span>${live.votos || 0}</span> / 5 Votos</span>
+                    </div>`;
+                
+                listaLives.appendChild(card);
+                contagemRenderizada++;
+
+                const countdown = setInterval(() => {
+                    tempoRestante--;
+                    let min = Math.floor(tempoRestante / 60);
+                    let seg = tempoRestante % 60;
+                    const tElement = document.getElementById(timerId);
+                    if (tElement) tElement.innerText = `${min < 10 ? '0' + min : min}:${seg < 10 ? '0' + seg : seg}`;
+                    if (tempoRestante <= 0) { clearInterval(countdown); database.ref('votas_lives/' + id).remove(); }
+                }, 1000);
+                intervalosAtivos.push(countdown);
+            }
+
+            loadMoreBtn.style.display = totalLivesAtivas > limiteExibicao ? 'block' : 'none';
+        }
+
+        // Escuta o banco de dados
+        database.ref('votas_lives').on('value', (snapshot) => {
+            dadosAtuaisLives = snapshot.exists() ? snapshot.val() : {};
+            renderizarLista(dadosAtuaisLives);
         });
 
-        // Cria votação
+        // Botão Carregar Mais funcional
+        loadMoreBtn.addEventListener('click', () => {
+            limiteExibicao += 10;
+            renderizarLista(dadosAtuaisLives);
+        });
+
+        // Enviar novo anúncio
         startBtn.addEventListener('click', () => {
-            const val = document.getElementById('tiktokInput').value.trim();
-            if (!val) return alert('Insira o @!');
-            let user = val.startsWith('@') ? val : '@' + val;
-            database.ref('votas_lives').push({ usuario: user, votos: 0 }).then(() => {
-                document.getElementById('tiktokInput').value = '';
-            });
-        });
+            const inputVal = document.getElementById('tiktokInput').value.trim();
+            const codigoDigitado = document.getElementById('validationCodeInput').value.trim();
+            const codigoOpcional = document.getElementById('optionalCodeInput').value.trim();
 
-        // Computa votos
-        window.votarLive = function(id, votosAtuais) {
-            const novosVotos = votosAtuais + 1;
-            if (novosVotos >= 5) {
-                database.ref('votas_lives/' + id).remove();
-            } else {
-                database.ref('votas_lives/' + id).update({ votos: novosVotos });
+            if (!inputVal || !codigoDigitado) return alert('Preencha o @ do criador e o Token!');
+            let user = inputVal.startsWith('@') ? inputVal : '@' + inputVal;
+
+            if (totalLivesAtivas >= 10 && !codigoOpcional) {
+                return alert('Fila cheia! Limite máximo de 10 transmissões atingido. É necessário usar o Código Opcional para prosseguir.');
             }
-        };
 
-        // Derruba live usando o código gerado no iPhone
-        ownerRemoveBtn.addEventListener('click', () => {
-            const cod = document.getElementById('ownerCodeInput').value.trim();
-            const target = document.getElementById('targetUserInput').value.trim();
-            if (!cod || !target) return alert('Preencha os dados!');
-            let formatted = target.startsWith('@') ? target : '@' + target;
+            database.ref('codigos_generados').once('value', (snapshot) => {
+                let d = snapshot.exists() ? snapshot.val() : {};
+                let tokenPrincipalValido = false; let chavePrincipal = null;
+                let tokenOpcionalValido = false; let chaveOpcional = null;
 
-            database.ref('codigos_gerados').once('value', (snapshot) => {
-                let valido = false; let chave = null;
-                if (snapshot.exists()) {
-                    const d = snapshot.val();
-                    for (let id in d) {
-                        if (d[id].codigo == cod || d[id] == cod) { valido = true; chave = id; break; }
-                    }
-                }
-
-                if (valido && chave) {
-                    database.ref('codigos_gerados/' + chave).remove(); // Consome o código
-                    database.ref('votas_lives').once('value', (lSnap) => {
-                        if (lSnap.exists()) {
-                            const lives = lSnap.val();
-                            for (let lId in lives) {
-                                if (lives[lId].usuario.toUpperCase() === formatted.toUpperCase()) {
-                                    database.ref('votas_lives/' + lId).remove();
-                                    alert('Live derrubada com sucesso pelo dono!');
-                                    break;
-                                }
-                            }
-                        }
-                    });
-                    document.getElementById('ownerCodeInput').value = '';
-                    document.getElementById('targetUserInput').value = '';
-                } else {
-                    alert('Código inválido ou já utilizado!');
-                }
-            });
-        });
-    </script>
+                for (let id in d) {
+                    if (d[id].codigo == codigoDigitado || d[id] == codigoDigitado) {
+                        tokenPrincipalValido = true; chavePrincipal = id;
+                        break;
+}
+}
+if (totalLivesAtivas >= 10 && codigoOpcional) {
+for (let id in d) {
+if (id !== chavePrincipal && (d[id].codigo == codigoOpcional || d[id] == codigoOpcional)) {
+tokenOpcionalValido = true; chaveOpcional = id;
+break;
+}
+}
+}
+if (tokenPrincipalValido && (totalLivesAtivas < 10 || tokenOpcionalValido)) {
+database.ref('codigos_gerados/' + chavePrincipal).remove();
+if (chaveOpcional) database.ref('codigos_gerados/' + chaveOpcional).remove();
+database.ref('votas_lives').push({
+usuario: user,
+votos: 0,
+criadoEm: firebase.database.ServerValue.TIMESTAMP
+}).then(() => {
+document.getElementById('tiktokInput').value = '';
+document.getElementById('validationCodeInput').value = '';
+document.getElementById('optionalCodeInput').value = '';
+limiteExibicao = 2;
+});
+} else {
+alert('Erro! Um ou ambos os códigos inseridos são inválidos ou já foram consumidos.');
+}
+});
+});
+// Mecanismo de votação
+window.votarLive = function(id, votosAtuais) {
+const novosVotos = votosAtuais + 1;
+if (novosVotos >= 5) { database.ref('votas_lives/' + id).remove(); }
+else { database.ref('votas_lives/' + id).update({ votos: novosVotos }); }
+};
+// Moderação Integrada
+ownerRemoveBtn.addEventListener('click', () => {
+const cod = document.getElementById('ownerCodeInput').value.trim();
+const target = document.getElementById('targetUserInput').value.trim();
+if (!cod || !target) return alert('Preencha as credenciais!');
+let formatted = target.startsWith('@') ? target : '@' + target;
+database.ref('codigos_gerados').once('value', (snapshot) => {
+let valido = false; let chave = null;
+if (snapshot.exists()) {
+const d = snapshot.val();
+for (let id in d) { if (d[id].codigo == cod || d[id] == cod) { valido = true; chave = id; break; } }
+}
+if (valido && chave) {
+database.ref('codigos_gerados/' + chave).remove();
+for (let lId in dadosAtuaisLives) {
+if (dadosAtuaisLives[lId].usuario.toUpperCase() === formatted.toUpperCase()) {
+database.ref('votas_lives/' + lId).remove();
+alert('Transmissão encerrada com sucesso.');
+break;
+}
+}
+document.getElementById('ownerCodeInput').value = '';
+document.getElementById('targetUserInput').value = '';
+} else {
+alert('Chave de sincronização inválida!');
+}
+});
+});
+</script>
 </body>
 </html>
